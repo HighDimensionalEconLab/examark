@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, mkdtempSync, rmSync, lstatSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, basename } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
 import { XMLParser } from 'fast-xml-parser';
@@ -99,8 +99,9 @@ export class QtiValidator {
         return report;
       }
 
-      // First, check for QTI 1.2 format (single XML file with <questestinterop>)
-      const xmlFiles = execSync(`find "${checkDir}" -maxdepth 1 -name "*.xml" -type f`, { encoding: 'utf-8' })
+      // First, check for QTI 1.2 format (single XML file with <questestinterop>),
+      // either at the root or in Canvas's <ident>/<ident>.xml layout
+      const xmlFiles = execSync(`find "${checkDir}" -maxdepth 2 -name "*.xml" -type f`, { encoding: 'utf-8' })
         .trim()
         .split('\n')
         .filter(f => f.length > 0);
@@ -113,7 +114,7 @@ export class QtiValidator {
 
           if (json.questestinterop) {
             // This is QTI 1.2 format - validate it (pass raw XML for HTML extraction)
-            return this.validateQti12(json, xmlFile, report, opts, content);
+            return this.validateQti12(json, xmlFile, report, opts, content, checkDir);
           }
         } catch (e) {
           // Continue checking other files
@@ -395,7 +396,7 @@ export class QtiValidator {
    * - Validates response processing completeness
    * - Ensures all items have explicit point values
    */
-  private validateQti12(json: any, filePath: string, report: DiagnosticReport, opts: ValidatorOptions = {}, rawXml?: string): DiagnosticReport {
+  private validateQti12(json: any, filePath: string, report: DiagnosticReport, opts: ValidatorOptions = {}, rawXml?: string, packageDir?: string): DiagnosticReport {
     const strict = opts.strict || false;
     const qti = json.questestinterop;
     const assessment = qti.assessment;
@@ -691,20 +692,25 @@ export class QtiValidator {
         report.errors.push(`QTI 1.2: Item ${itemIdent} missing response element (response_lid or response_str)`);
       }
       
-      // Check for embedded images with data URIs (should work in Canvas)
-      const bodyContent = JSON.stringify(item.presentation);
-      if (bodyContent.includes('data:image')) {
-        // Good - embedded image
-      } else if (bodyContent.includes('<img') && bodyContent.includes('src=')) {
-        // Check if it's a relative path (may not work)
-        if (!bodyContent.includes('data:') && !bodyContent.includes('http')) {
-          report.warnings.push(`Item ${itemIdent} has image with relative path - may not display in Canvas`);
-        }
-      }
       }
     } catch (error: any) {
       // Log error but continue with summary
       report.warnings.push(`⚠️  Error during item validation: ${error.message}`);
+    }
+
+    // Bundled images: every relative <img src> must exist in the package,
+    // next to the QTI file or at the package root
+    if (packageDir) {
+      const imageSrcs = new Set<string>();
+      mattextHtmlMap.forEach(html => {
+        for (const m of html.matchAll(/<img[^>]*\ssrc="([^"]+)"/g)) imageSrcs.add(m[1]);
+      });
+      imageSrcs.forEach(src => {
+        if (src.startsWith('data:') || /^https?:\/\//.test(src)) return;
+        if (!existsSync(join(packageDir, src)) && !existsSync(join(dirname(filePath), src))) {
+          report.errors.push(`Missing image file '${src}' referenced in ${basename(filePath)}`);
+        }
+      });
     }
 
     // Add Quarto GFM compatibility summary to warnings (informational)

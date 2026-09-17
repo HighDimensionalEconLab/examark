@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync, mkdirSync, copyFileSy
 import { tmpdir } from 'os';
 import { join, basename, dirname, resolve, extname } from 'path';
 import { parseMarkdown } from './parser/markdown.js';
-import { generateQTI, ImageResolver } from './generator/qti.js';
+import { generateQTI, generateAssessmentMeta, generateCanvasId, ImageResolver } from './generator/qti.js';
 import { generateText, TextExportOptions } from './generator/text.js';
 import { QtiValidator } from './diagnostic/validator.js';
 import { lintMarkdown } from './diagnostic/linter.js';
@@ -276,8 +276,25 @@ async function convertFile(
   try {
     const { qti, assessmentIdent } = generateQTI(parsed, imageResolver);
 
-    const qtiFilename = `${parsed.title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.xml`;
+    // Canvas export layout: <ident>/<ident>.xml plus <ident>/assessment_meta.xml,
+    // which Canvas looks up by the assessment ident on import
+    mkdirSync(join(tempDir, assessmentIdent));
+    const qtiFilename = `${assessmentIdent}/${assessmentIdent}.xml`;
     writeFileSync(join(tempDir, qtiFilename), qti);
+
+    let metaDependency = '';
+    let metaResource = '';
+    if (parsed.canvas) {
+      const metaFilename = `${assessmentIdent}/assessment_meta.xml`;
+      const metaIdent = generateCanvasId(`meta_${assessmentIdent}`);
+      writeFileSync(join(tempDir, metaFilename), generateAssessmentMeta(parsed, assessmentIdent));
+      metaDependency = `
+      <dependency identifierref="${metaIdent}"/>`;
+      metaResource = `
+    <resource identifier="${metaIdent}" type="associatedcontent/imscc_xmlv1p1/learning-application-resource" href="${metaFilename}">
+      <file href="${metaFilename}"/>
+    </resource>`;
+    }
 
     const manifestId = `MANIFEST_${Date.now()}`;
     const imageResources = bundledImages.map((img, i) =>
@@ -295,9 +312,9 @@ async function convertFile(
   </metadata>
   <organizations/>
   <resources>
-    <resource identifier="QTI_RESOURCE" type="imsqti_xmlv1p2" href="${qtiFilename}">
-      <file href="${qtiFilename}"/>
-    </resource>
+    <resource identifier="${assessmentIdent}" type="imsqti_xmlv1p2" href="${qtiFilename}">
+      <file href="${qtiFilename}"/>${metaDependency}
+    </resource>${metaResource}
 ${imageResources}
   </resources>
 </manifest>`;

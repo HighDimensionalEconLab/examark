@@ -82,6 +82,47 @@ examark quiz.md -p 2
 examark quiz.md --preview
 ```
 
+## Canvas Quiz Settings
+
+A YAML front matter block at the top of the Markdown file sets the quiz title and
+Canvas Classic Quiz settings. Quarto's `exam-gfm` format writes the document
+metadata there automatically.
+
+```yaml
+---
+title: "Midterm 1"
+description: "Closed book. One attempt."
+canvas:
+  quiz_type: assignment          # practice_quiz | assignment | graded_survey | survey
+  time_limit: 50                 # minutes
+  allowed_attempts: 1            # -1 = unlimited
+  scoring_policy: keep_highest   # keep_highest | keep_latest | keep_average
+  shuffle_answers: true
+  show_correct_answers: false
+  one_question_at_a_time: true
+  cant_go_back: false
+  access_code: "econ526"
+  require_lockdown_browser: true
+  require_lockdown_browser_for_results: false
+  require_lockdown_browser_monitor: false
+  unlock_at: 2026-10-05T09:00:00-07:00   # ISO 8601; times without an offset are UTC
+  due_at: 2026-10-05T10:00:00-07:00
+  lock_at: 2026-10-05T10:00:00-07:00
+---
+```
+
+Every key is optional; Canvas applies its own defaults to keys that are absent.
+The settings are written to `assessment_meta.xml` next to the assessment XML,
+using Canvas's own export layout (`<ident>/<ident>.xml`,
+`<ident>/assessment_meta.xml`, `imsmanifest.xml`, `images/`), which Canvas reads
+on import. The time limit and attempt count are also written as `qmd_timelimit`
+and `cc_maxattempts` in the assessment's `qtimetadata`.
+
+Canvas keys an imported quiz by the assessment `ident`, which examark derives from
+the title. Re-importing a package with the same title updates the existing quiz
+only when the Canvas import option "Overwrite assessment content with matching
+IDs" is selected; otherwise Canvas creates a second quiz.
+
 ---
 
 ## Batch Conversion

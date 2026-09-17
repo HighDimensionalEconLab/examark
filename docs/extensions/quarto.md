@@ -152,6 +152,26 @@ exam:
 ---
 ```
 
+### Canvas Quiz Settings
+
+A `canvas:` block in the front matter sets the Classic Quiz options (type, time
+limit, attempts, scoring policy, shuffling, LockDown Browser, availability
+window). The `exam-gfm` format carries the front matter into the `.md` file and
+`examark` writes it to `assessment_meta.xml` in the QTI package. See the
+[CLI reference](../reference.md#canvas-quiz-settings) for the full key list.
+
+```yaml
+---
+title: "Practice Quiz 1"
+format: exam-gfm
+canvas:
+  quiz_type: practice_quiz
+  time_limit: 30
+  allowed_attempts: -1
+  shuffle_answers: true
+---
+```
+
 ### Project Configuration (`_quarto.yml`)
 
 For multi-file projects, configure defaults in `_quarto.yml`:

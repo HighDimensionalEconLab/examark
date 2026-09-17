@@ -55,11 +55,32 @@ export interface Section {
   questionIds: number[];
 }
 
+/** Canvas Classic Quiz settings, written to assessment_meta.xml */
+export interface CanvasSettings {
+  quiz_type?: 'practice_quiz' | 'assignment' | 'graded_survey' | 'survey';
+  time_limit?: number;            // minutes
+  allowed_attempts?: number;      // -1 = unlimited
+  scoring_policy?: 'keep_highest' | 'keep_latest' | 'keep_average';
+  shuffle_answers?: boolean;
+  show_correct_answers?: boolean;
+  one_question_at_a_time?: boolean;
+  cant_go_back?: boolean;
+  access_code?: string;
+  description?: string;           // Quiz instructions (HTML allowed)
+  require_lockdown_browser?: boolean;
+  require_lockdown_browser_for_results?: boolean;
+  require_lockdown_browser_monitor?: boolean;
+  unlock_at?: string;             // ISO 8601; naive times are read as UTC by Canvas
+  due_at?: string;
+  lock_at?: string;
+}
+
 export interface ParsedQuiz {
   title: string;           // Pool/Bank name
   defaultPoints: number;
   sections: Section[];
   questions: Question[];
+  canvas?: CanvasSettings; // Present when the front matter has a canvas: block
 }
 
 /**

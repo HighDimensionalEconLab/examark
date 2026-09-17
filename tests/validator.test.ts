@@ -523,3 +523,53 @@ describe('QtiValidator Strict Mode', () => {
     expect(strictReport.warnings.some(w => w.includes('Strict: Item q1 missing "title"'))).toBe(true);
   });
 });
+
+describe('QtiValidator Canvas export layout', () => {
+  let dir: string;
+  const ident = 'abc123';
+  const qti = (img: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2">
+<assessment ident="${ident}" title="Layout Quiz"><qtimetadata></qtimetadata><section ident="root_section">
+<item ident="item1" title="Question"><itemmetadata><qtimetadata>
+<qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>multiple_choice_question</fieldentry></qtimetadatafield>
+</qtimetadata></itemmetadata>
+<presentation><material><mattext texttype="text/html">See <img src="${img}" alt=""/></mattext></material>
+<response_lid ident="response1" rcardinality="Single"><render_choice>
+<response_label ident="a"><material><mattext texttype="text/html">yes</mattext></material></response_label>
+<response_label ident="b"><material><mattext texttype="text/html">no</mattext></material></response_label>
+</render_choice></response_lid></presentation>
+<resprocessing><outcomes><decvar maxvalue="100" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes>
+<respcondition continue="No"><conditionvar><varequal respident="response1">a</varequal></conditionvar>
+<setvar actoin="Set" varname="SCORE">100</setvar></respcondition></resprocessing>
+</item></section></assessment></questestinterop>`;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'qti-layout-'));
+    mkdirSync(join(dir, ident));
+    mkdirSync(join(dir, 'images'));
+    writeFileSync(join(dir, 'images', 'plot.png'), 'png');
+    writeFileSync(join(dir, ident, 'assessment_meta.xml'), `<quiz identifier="${ident}"><title>Layout Quiz</title></quiz>`);
+    writeFileSync(join(dir, 'imsmanifest.xml'), `<manifest identifier="m"><resources>
+      <resource identifier="${ident}" type="imsqti_xmlv1p2" href="${ident}/${ident}.xml"><file href="${ident}/${ident}.xml"/><dependency identifierref="meta"/></resource>
+      <resource identifier="meta" type="associatedcontent/imscc_xmlv1p1/learning-application-resource" href="${ident}/assessment_meta.xml"><file href="${ident}/assessment_meta.xml"/></resource>
+    </resources></manifest>`);
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('finds the QTI 1.2 file under <ident>/ and accepts bundled images', async () => {
+    writeFileSync(join(dir, ident, `${ident}.xml`), qti('images/plot.png'));
+    const report = await new QtiValidator().validatePackage(dir);
+    expect(report.errors).toEqual([]);
+    expect(report.isValid).toBe(true);
+    expect(report.details.itemCount).toBe(1);
+    expect(report.details.testFound).toBe(true);
+  });
+
+  it('reports an image missing from the package', async () => {
+    writeFileSync(join(dir, ident, `${ident}.xml`), qti('images/missing.png'));
+    const report = await new QtiValidator().validatePackage(dir);
+    expect(report.isValid).toBe(false);
+    expect(report.errors).toEqual([`Missing image file 'images/missing.png' referenced in ${ident}.xml`]);
+  });
+});

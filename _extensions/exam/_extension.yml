@@ -110,7 +110,8 @@ contributes:
     # Auto-generates QTI by default
     # =========================================
     gfm:
-      variant: gfm+tex_math_dollars
+      variant: gfm+tex_math_dollars+yaml_metadata_block
+      wrap: none
       post-render: qti-post-render.js
       exam:
         qti: true

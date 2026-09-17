@@ -687,23 +687,65 @@ export function generateQTI(quiz: ParsedQuiz, imageResolver?: ImageResolver): { 
   // Canvas puts all questions in a single root_section anyway
   const allQuestionsXml = quiz.questions.map(q => generateQuestionXml(q, imageResolver)).join('');
 
+  // Assessment-level metadata Canvas's QTI 1.2 importer reads directly
+  // (assessment_meta.xml carries the full settings; these are the fallback)
+  const canvas = quiz.canvas ?? {};
+  const attempts = canvas.allowed_attempts ?? 1;
+  const metadataField = (label: string, entry: string) =>
+    `<qtimetadatafield><fieldlabel>${label}</fieldlabel><fieldentry>${entry}</fieldentry></qtimetadatafield>`;
+  let assessmentMetadata = metadataField('cc_maxattempts', attempts === -1 ? 'unlimited' : String(attempts));
+  if (canvas.time_limit) {
+    assessmentMetadata += metadataField('qmd_timelimit', String(canvas.time_limit));
+  }
+
   // Build the complete QTI document (compact format like Canvas)
   const qti = `<?xml version="1.0" encoding="UTF-8"?>` +
     `<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2" ` +
     `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ` +
     `xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">` +
     `<assessment ident="${assessmentIdent}" title="${escapeXmlPreserveLaTeX(quiz.title)}">` +
-    `<qtimetadata>` +
-    `<qtimetadatafield>` +
-    `<fieldlabel>cc_maxattempts</fieldlabel>` +
-    `<fieldentry>1</fieldentry>` +
-    `</qtimetadatafield>` +
-    `</qtimetadata>` +
+    `<qtimetadata>${assessmentMetadata}</qtimetadata>` +
     `<section ident="root_section">` +
     `${allQuestionsXml}` +
     `</section>` +
     `</assessment>` +
     `</questestinterop>`;
-    
+
   return { qti, assessmentIdent };
+}
+
+/**
+ * Generate Canvas's assessment_meta.xml (quiz settings) from the front matter.
+ * Canvas reads it on import when the manifest lists it as a
+ * learning-application-resource at <assessment ident>/assessment_meta.xml.
+ */
+export function generateAssessmentMeta(quiz: ParsedQuiz, assessmentIdent: string): string {
+  const canvas = quiz.canvas ?? {};
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const pointsPossible = quiz.questions.reduce((sum, q) => sum + q.points, 0);
+
+  const fields: string[] = [`<title>${escape(quiz.title)}</title>`];
+  if (canvas.description !== undefined) fields.push(`<description>${escape(canvas.description)}</description>`);
+  if (canvas.shuffle_answers !== undefined) fields.push(`<shuffle_answers>${canvas.shuffle_answers}</shuffle_answers>`);
+  if (canvas.scoring_policy !== undefined) fields.push(`<scoring_policy>${canvas.scoring_policy}</scoring_policy>`);
+  if (canvas.quiz_type !== undefined) fields.push(`<quiz_type>${canvas.quiz_type}</quiz_type>`);
+  fields.push(`<points_possible>${pointsPossible}</points_possible>`);
+  if (canvas.show_correct_answers !== undefined) fields.push(`<show_correct_answers>${canvas.show_correct_answers}</show_correct_answers>`);
+  if (canvas.allowed_attempts !== undefined) fields.push(`<allowed_attempts>${canvas.allowed_attempts}</allowed_attempts>`);
+  if (canvas.time_limit !== undefined) fields.push(`<time_limit>${canvas.time_limit}</time_limit>`);
+  if (canvas.one_question_at_a_time !== undefined) fields.push(`<one_question_at_a_time>${canvas.one_question_at_a_time}</one_question_at_a_time>`);
+  if (canvas.cant_go_back !== undefined) fields.push(`<cant_go_back>${canvas.cant_go_back}</cant_go_back>`);
+  if (canvas.access_code !== undefined) fields.push(`<access_code>${escape(canvas.access_code)}</access_code>`);
+  if (canvas.require_lockdown_browser !== undefined) fields.push(`<require_lockdown_browser>${canvas.require_lockdown_browser}</require_lockdown_browser>`);
+  if (canvas.require_lockdown_browser_for_results !== undefined) fields.push(`<require_lockdown_browser_for_results>${canvas.require_lockdown_browser_for_results}</require_lockdown_browser_for_results>`);
+  if (canvas.require_lockdown_browser_monitor !== undefined) fields.push(`<require_lockdown_browser_monitor>${canvas.require_lockdown_browser_monitor}</require_lockdown_browser_monitor>`);
+  if (canvas.unlock_at !== undefined) fields.push(`<unlock_at>${escape(String(canvas.unlock_at))}</unlock_at>`);
+  if (canvas.due_at !== undefined) fields.push(`<due_at>${escape(String(canvas.due_at))}</due_at>`);
+  if (canvas.lock_at !== undefined) fields.push(`<lock_at>${escape(String(canvas.lock_at))}</lock_at>`);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<quiz identifier="${assessmentIdent}" xmlns="http://canvas.instructure.com/xsd/cccv1p0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://canvas.instructure.com/xsd/cccv1p0 https://canvas.instructure.com/xsd/cccv1p0.xsd">
+  ${fields.join('\n  ')}
+</quiz>
+`;
 }

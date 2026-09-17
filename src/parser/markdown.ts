@@ -3,8 +3,9 @@
  * Supports both original format AND Quarto GFM output
  */
 
-import type { ParsedQuiz, Question, Section, AnswerOption, QuestionType, MatchPair, BlankAnswer } from './types.js';
+import type { ParsedQuiz, Question, Section, AnswerOption, QuestionType, MatchPair, BlankAnswer, CanvasSettings } from './types.js';
 import { slugify } from './types.js';
+import { parse as parseYaml } from 'yaml';
 
 /**
  * Type marker aliases - maps various formats to canonical QuestionType
@@ -575,9 +576,26 @@ function parseBlanks(stem: string, lines: string[]): BlankAnswer[] {
  * Supports Quarto GFM output format
  */
 export function parseMarkdown(content: string): ParsedQuiz {
-  const lines = content.split('\n');
-  
   let title = 'Quiz';
+  let canvas: CanvasSettings | undefined;
+
+  // YAML front matter (Quarto's gfm+yaml_metadata_block writer emits the
+  // document metadata here): title, canvas quiz settings, description
+  const frontMatter = content.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+  if (frontMatter) {
+    const meta = parseYaml(frontMatter[1]) ?? {};
+    if (typeof meta.title === 'string') title = meta.title;
+    if (meta.canvas || typeof meta.description === 'string') {
+      canvas = { ...(meta.canvas ?? {}) };
+      if (canvas.description === undefined && typeof meta.description === 'string') {
+        canvas.description = meta.description;
+      }
+    }
+    content = content.slice(frontMatter[0].length);
+  }
+
+  const lines = content.split('\n');
+
   let defaultPoints = 1;
   const sections: Section[] = [];
   const questions: Question[] = [];
@@ -963,5 +981,5 @@ export function parseMarkdown(content: string): ParsedQuiz {
   // Finalize last question
   finalizeQuestion();
   
-  return { title, defaultPoints, sections, questions };
+  return { title, defaultPoints, sections, questions, canvas };
 }

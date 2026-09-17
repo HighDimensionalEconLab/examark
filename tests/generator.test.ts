@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { generateItem, generateManifest21, generateTest } from '../src/generator/qti21';
-import { generateQTI, convertMarkdownTablesToHtml } from '../src/generator/qti';
+import { generateQTI, generateAssessmentMeta, convertMarkdownTablesToHtml } from '../src/generator/qti';
 import { parseMarkdown } from '../src/parser/markdown';
 import type { ParsedQuiz, Question } from '../src/parser/types';
 import { readFileSync } from 'fs';
@@ -427,5 +427,74 @@ $$
     expect(qti).not.toContain('`');
     expect(qti).toContain('\\[\nA = \\begin{bmatrix} 0.6 &amp; 0.1 \\\\ 0.5 &amp; 0.8 \\end{bmatrix}\n\\]');
     expect(() => parser.parse(qti)).not.toThrow();
+  });
+});
+
+describe('Canvas quiz settings from front matter', () => {
+  const md = `---
+title: Practice Quiz 1
+description: Covers eigenvalues and least squares.
+canvas:
+  quiz_type: practice_quiz
+  time_limit: 30
+  allowed_attempts: -1
+  scoring_policy: keep_highest
+  shuffle_answers: true
+  show_correct_answers: true
+  require_lockdown_browser: true
+  unlock_at: 2026-09-25T09:00:00-07:00
+  due_at: 2026-10-02T23:59:00-07:00
+---
+
+## 1. Two plus two [3 pts]
+
+a) 3
+b) 4 [correct]
+`;
+
+  it('reads title and canvas settings and strips the front matter', () => {
+    const quiz = parseMarkdown(md);
+    expect(quiz.title).toBe('Practice Quiz 1');
+    expect(quiz.questions).toHaveLength(1);
+    expect(quiz.questions[0].stem).toBe('Two plus two');
+    expect(quiz.canvas).toMatchObject({
+      quiz_type: 'practice_quiz',
+      time_limit: 30,
+      allowed_attempts: -1,
+      require_lockdown_browser: true,
+      unlock_at: '2026-09-25T09:00:00-07:00',
+      description: 'Covers eigenvalues and least squares.',
+    });
+  });
+
+  it('emits assessment_meta.xml fields and qtimetadata fallbacks', () => {
+    const quiz = parseMarkdown(md);
+    const { qti, assessmentIdent } = generateQTI(quiz);
+    expect(qti).toContain('<fieldlabel>cc_maxattempts</fieldlabel><fieldentry>unlimited</fieldentry>');
+    expect(qti).toContain('<fieldlabel>qmd_timelimit</fieldlabel><fieldentry>30</fieldentry>');
+
+    const meta = generateAssessmentMeta(quiz, assessmentIdent);
+    const json = parser.parse(meta);
+    expect(json.quiz['@_identifier']).toBe(assessmentIdent);
+    expect(json.quiz.title).toBe('Practice Quiz 1');
+    expect(json.quiz.quiz_type).toBe('practice_quiz');
+    expect(json.quiz.time_limit).toBe(30);
+    expect(json.quiz.allowed_attempts).toBe(-1);
+    expect(json.quiz.scoring_policy).toBe('keep_highest');
+    expect(json.quiz.shuffle_answers).toBe(true);
+    expect(json.quiz.require_lockdown_browser).toBe(true);
+    expect(json.quiz.unlock_at).toBe('2026-09-25T09:00:00-07:00');
+    expect(json.quiz.due_at).toBe('2026-10-02T23:59:00-07:00');
+    expect(json.quiz.points_possible).toBe(3);
+    expect(json.quiz.description).toBe('Covers eigenvalues and least squares.');
+    expect(json.quiz.lock_at).toBeUndefined();
+  });
+
+  it('keeps upstream defaults without a canvas block', () => {
+    const quiz = parseMarkdown('# Plain Quiz\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(quiz.canvas).toBeUndefined();
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<fieldlabel>cc_maxattempts</fieldlabel><fieldentry>1</fieldentry>');
+    expect(qti).not.toContain('qmd_timelimit');
   });
 });
