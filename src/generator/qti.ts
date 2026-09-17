@@ -170,6 +170,10 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
     return placeholder;
   });
 
+  // Drop Quarto figure div wrappers (<div id="fig-...">...</div>): they carry no
+  // meaning in Canvas and would otherwise be escaped into visible text
+  result = result.replace(/<div\b[^>]*\bid="fig-[^"]*"[^>]*>|<\/div>/g, '');
+
   // Strip Quarto cross-reference anchor tags (e.g., <a href="#fig-..." class="quarto-xref">Figure 1</a>)
   // Replace with just the link text since figures are already embedded
   result = result.replace(/<a\s+href=["']#[^"']*["']\s+class=["']quarto-xref["'][^>]*>(.*?)<\/a>/gi, '$1');

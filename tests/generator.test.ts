@@ -498,3 +498,30 @@ b) 4 [correct]
     expect(qti).not.toContain('qmd_timelimit');
   });
 });
+
+describe('Quarto figure blocks', () => {
+  it('emits the image and caption without the div wrapper', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. Which curve grows? [2 pts]
+
+<div id="fig-norms">
+
+<img src="q_files/figure-gfm/fig-norms-output-1.png"
+id="fig-norms" />
+
+Figure 1: Norms of the iterates.
+
+</div>
+
+a) I
+b) II [correct]
+`);
+    expect(quiz.questions[0].stem).toContain('<div id="fig-norms">');
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<img src="q_files/figure-gfm/fig-norms-output-1.png" alt=""/>');
+    expect(qti).toContain('Figure 1: Norms of the iterates.');
+    expect(qti).not.toContain('&lt;div');
+    expect(qti).not.toContain('&lt;/div');
+  });
+});
