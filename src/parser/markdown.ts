@@ -701,10 +701,41 @@ export function parseMarkdown(content: string): ParsedQuiz {
     currentQuestionLines = [];
   };
   
+  // Verbatim blocks (fenced code, multi-line $$ math) are collected line by line,
+  // untrimmed, and appended to the stem as a unit so that lines inside them are
+  // never mistaken for options, rules, or front matter
+  let verbatimClose: RegExp | null = null;
+  let verbatimLines: string[] = [];
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    
+
+    if (verbatimClose) {
+      verbatimLines.push(line);
+      if (verbatimClose.test(trimmed)) {
+        verbatimClose = null;
+        if (currentQuestion) {
+          currentQuestion.stem += '\n\n' + verbatimLines.join('\n');
+        }
+        verbatimLines = [];
+      }
+      continue;
+    }
+    if (currentQuestion && !inSolutionBlock && !inFigureBlock) {
+      const fenceMatch = trimmed.match(/^(`{3,}|~{3,})/);
+      if (fenceMatch) {
+        verbatimClose = new RegExp(`^${fenceMatch[1]}\\s*$`);
+        verbatimLines = [line];
+        continue;
+      }
+      if (trimmed.startsWith('$$') && !trimmed.slice(2).includes('$$')) {
+        verbatimClose = /\$\$/;
+        verbatimLines = [trimmed];
+        continue;
+      }
+    }
+
     // Skip empty lines, horizontal rules, and HTML comments
     if (!trimmed || trimmed === '---' || trimmed.match(/^-{3,}$/) || trimmed.match(/^<!--.*-->$/)) {
       continue;

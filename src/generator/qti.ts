@@ -125,9 +125,23 @@ export function convertMarkdownTablesToHtml(text: string): string {
  * Also converts markdown images to HTML img tags with optional base64 embedding
  */
 function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): string {
-  // First, extract and preserve markdown images as placeholders
+  // Fenced code blocks first: their content is verbatim, so nothing below
+  // (inline code, math, bold, tables) may touch it
+  const fences: string[] = [];
+  let result = text.replace(
+    /^[ \t]*(`{3,}|~{3,})[ \t]*([\w+.-]*)[^\n]*\n([\s\S]*?)\n[ \t]*\1[ \t]*$/gm,
+    (match, fence, lang, code) => {
+      const placeholder = `__FENCE_PLACEHOLDER_${fences.length}__`;
+      const escapedCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const classAttr = lang ? ` class="language-${lang}"` : '';
+      fences.push(`<pre><code${classAttr}>${escapedCode}</code></pre>`);
+      return placeholder;
+    }
+  );
+
+  // Extract and preserve markdown images as placeholders
   const images: string[] = [];
-  let result = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
     const placeholder = `__IMG_PLACEHOLDER_${images.length}__`;
     // If we have an image resolver, try to get a data URI
     let imgSrc = src;
@@ -245,6 +259,10 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
 
   codeSnippets.forEach((code, i) => {
     result = result.replace(`__CODE_PLACEHOLDER_${i}__`, code);
+  });
+
+  fences.forEach((fence, i) => {
+    result = result.replace(`__FENCE_PLACEHOLDER_${i}__`, fence);
   });
 
   return result;

@@ -385,3 +385,47 @@ describe('Table conversion', () => {
     expect(html).toContain('Here is general feedback');
   });
 });
+
+describe('Fenced code blocks', () => {
+  const md = `# Code Quiz
+
+## 1. What is printed? [2 pts]
+
+Consider the snippet, with \`A\` a 2x2 array:
+
+\`\`\` python
+Lambda, Q = np.linalg.eig(A)
+rho_A = np.max(np.abs(Lambda))
+
+print(rho_A < 1)   # a < b
+\`\`\`
+
+and the matrix
+
+$$
+A = \\begin{bmatrix} 0.6 & 0.1 \\\\ 0.5 & 0.8 \\end{bmatrix}
+$$
+
+1)  True [correct]
+2)  False
+`;
+
+  it('keeps the fence verbatim in the stem', () => {
+    const quiz = parseMarkdown(md);
+    expect(quiz.questions).toHaveLength(1);
+    const stem = quiz.questions[0].stem;
+    expect(stem).toContain('``` python\nLambda, Q = np.linalg.eig(A)\nrho_A = np.max(np.abs(Lambda))\n\nprint(rho_A < 1)   # a < b\n```');
+    expect(stem).toContain('$$\nA = \\begin{bmatrix} 0.6 & 0.1 \\\\ 0.5 & 0.8 \\end{bmatrix}\n$$');
+    expect(quiz.questions[0].options).toHaveLength(2);
+    expect(quiz.questions[0].options[0].isCorrect).toBe(true);
+  });
+
+  it('emits <pre><code> with escaped content and no stray backticks', () => {
+    const { qti } = generateQTI(parseMarkdown(md));
+    expect(qti).toContain('<pre><code class="language-python">Lambda, Q = np.linalg.eig(A)\nrho_A = np.max(np.abs(Lambda))\n\nprint(rho_A &lt; 1)   # a &lt; b</code></pre>');
+    expect(qti).toContain('<code>A</code>');
+    expect(qti).not.toContain('`');
+    expect(qti).toContain('\\[\nA = \\begin{bmatrix} 0.6 &amp; 0.1 \\\\ 0.5 &amp; 0.8 \\end{bmatrix}\n\\]');
+    expect(() => parser.parse(qti)).not.toThrow();
+  });
+});
