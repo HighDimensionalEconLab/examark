@@ -170,10 +170,6 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
     return placeholder;
   });
 
-  // Drop Quarto figure div wrappers (<div id="fig-...">...</div>): they carry no
-  // meaning in Canvas and would otherwise be escaped into visible text
-  result = result.replace(/<div\b[^>]*\bid="fig-[^"]*"[^>]*>|<\/div>/g, '');
-
   // Strip Quarto cross-reference anchor tags (e.g., <a href="#fig-..." class="quarto-xref">Figure 1</a>)
   // Replace with just the link text since figures are already embedded
   result = result.replace(/<a\s+href=["']#[^"']*["']\s+class=["']quarto-xref["'][^>]*>(.*?)<\/a>/gi, '$1');
@@ -188,6 +184,13 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
     codeSnippets.push(`<code>${escapedCode}</code>`);
     return placeholder;
   });
+
+  // Drop Quarto figure div wrappers (<div id="fig-...">...</div>): they carry no
+  // meaning in Canvas and would otherwise be escaped into visible text. Runs after
+  // inline code is extracted so a literal </div> in code survives, and removes a
+  // closing tag only when paired with a figure opening (the parser usually eats it)
+  result = result.replace(/<div\b[^>]*\bid="fig-[^"]*"[^>]*>([\s\S]*?)<\/div>/g, (match, inner) => inner);
+  result = result.replace(/<div\b[^>]*\bid="fig-[^"]*"[^>]*>/g, '');
 
   // Extract LaTeX as placeholders BEFORE markdown formatting,
   // so that * inside $...$ (e.g., $z^*$) isn't treated as bold/italic
@@ -246,27 +249,27 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
   // Restore in reverse extraction order: outer containers first, inner content last.
   // Tables may contain LaTeX/HTML/code placeholders, so restore tables first.
   tables.forEach((table, i) => {
-    result = result.replace(`__TABLE_PLACEHOLDER_${i}__`, table);
+    result = result.replace(`__TABLE_PLACEHOLDER_${i}__`, () => table);
   });
 
   htmlTags.forEach((tag, i) => {
-    result = result.replace(`__HTML_PLACEHOLDER_${i}__`, tag);
+    result = result.replace(`__HTML_PLACEHOLDER_${i}__`, () => tag);
   });
 
   latexSnippets.forEach((latex, i) => {
-    result = result.replace(`__LATEX_PLACEHOLDER_${i}__`, latex);
+    result = result.replace(`__LATEX_PLACEHOLDER_${i}__`, () => latex);
   });
 
   images.forEach((img, i) => {
-    result = result.replace(`__IMG_PLACEHOLDER_${i}__`, img);
+    result = result.replace(`__IMG_PLACEHOLDER_${i}__`, () => img);
   });
 
   codeSnippets.forEach((code, i) => {
-    result = result.replace(`__CODE_PLACEHOLDER_${i}__`, code);
+    result = result.replace(`__CODE_PLACEHOLDER_${i}__`, () => code);
   });
 
   fences.forEach((fence, i) => {
-    result = result.replace(`__FENCE_PLACEHOLDER_${i}__`, fence);
+    result = result.replace(`__FENCE_PLACEHOLDER_${i}__`, () => fence);
   });
 
   return result;

@@ -573,3 +573,25 @@ describe('QtiValidator Canvas export layout', () => {
     expect(report.errors).toEqual([`Missing image file 'images/missing.png' referenced in ${ident}.xml`]);
   });
 });
+
+describe('QtiValidator manifest resolution', () => {
+  it('validates the assessment the manifest points at, not a stale one', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'qti-manifest-'));
+    const item = (ok: boolean) => `<?xml version="1.0" encoding="UTF-8"?>
+<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2"><assessment ident="x" title="T"><qtimetadata></qtimetadata><section ident="root_section">
+<item ident="i" title="Question"><itemmetadata><qtimetadata><qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>multiple_choice_question</fieldentry></qtimetadatafield></qtimetadata></itemmetadata>
+<presentation><material><mattext texttype="text/html">Which answer is the correct one here?</mattext></material><response_lid ident="response1" rcardinality="Single"><render_choice>
+<response_label ident="a"><material><mattext texttype="text/html">first</mattext></material></response_label>
+<response_label ident="b"><material><mattext texttype="text/html">second</mattext></material></response_label></render_choice></response_lid></presentation>
+${ok ? '<resprocessing><outcomes><decvar maxvalue="100" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes><respcondition continue="No"><conditionvar><varequal respident="response1">a</varequal></conditionvar><setvar actoin="Set" varname="SCORE">100</setvar></respcondition></resprocessing>' : ''}
+</item></section></assessment></questestinterop>`;
+    mkdirSync(join(dir, 'aaa')); mkdirSync(join(dir, 'bbb'));
+    writeFileSync(join(dir, 'aaa', 'aaa.xml'), item(false));
+    writeFileSync(join(dir, 'bbb', 'bbb.xml'), item(true));
+    writeFileSync(join(dir, 'imsmanifest.xml'), `<manifest identifier="m"><resources><resource identifier="bbb" type="imsqti_xmlv1p2" href="bbb/bbb.xml"><file href="bbb/bbb.xml"/></resource></resources></manifest>`);
+    const report = await new QtiValidator().validatePackage(dir);
+    rmSync(dir, { recursive: true, force: true });
+    expect(report.errors).toEqual([]);
+    expect(report.isValid).toBe(true);
+  });
+});

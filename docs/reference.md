@@ -118,6 +118,13 @@ using Canvas's own export layout (`<ident>/<ident>.xml`,
 on import. The time limit and attempt count are also written as `qmd_timelimit`
 and `cc_maxattempts` in the assessment's `qtimetadata`.
 
+**Input assumptions.** The parser is written for the Markdown that Quarto's
+`exam-gfm` format produces. Hand-written Markdown must follow the same shape: fenced
+code blocks are closed with the same fence they opened with and are never empty, code
+blocks appear only inside questions, the file does not open with a `---` horizontal rule
+(only real YAML front matter), and the quiz title is plain text without Markdown
+emphasis or `<`. None of these are checked.
+
 Canvas keys an imported quiz by the assessment `ident`, which examark derives from
 the title. Re-importing a package with the same title updates the existing quiz
 only when the Canvas import option "Overwrite assessment content with matching

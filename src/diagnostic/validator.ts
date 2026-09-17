@@ -99,12 +99,28 @@ export class QtiValidator {
         return report;
       }
 
-      // First, check for QTI 1.2 format (single XML file with <questestinterop>),
-      // either at the root or in Canvas's <ident>/<ident>.xml layout
-      const xmlFiles = execSync(`find "${checkDir}" -maxdepth 2 -name "*.xml" -type f`, { encoding: 'utf-8' })
-        .trim()
-        .split('\n')
-        .filter(f => f.length > 0);
+      // First, check for QTI 1.2 format (single XML file with <questestinterop>).
+      // Prefer the file the manifest points at; otherwise scan the root and
+      // Canvas's <ident>/<ident>.xml layout
+      let xmlFiles: string[] = [];
+      const manifestFile = join(checkDir, 'imsmanifest.xml');
+      if (existsSync(manifestFile)) {
+        try {
+          const manifest = this.parser.parse(readFileSync(manifestFile, 'utf-8'));
+          for (const resource of manifest.manifest?.resources?.resource || []) {
+            const href = resource['@_type'] === 'imsqti_xmlv1p2' && (resource['@_href'] || resource.file?.[0]?.['@_href']);
+            if (href) xmlFiles.push(join(checkDir, href));
+          }
+        } catch (e) {
+          // Unreadable manifest: fall through to the directory scan
+        }
+      }
+      if (xmlFiles.length === 0) {
+        xmlFiles = execSync(`find "${checkDir}" -maxdepth 2 -name "*.xml" -type f`, { encoding: 'utf-8' })
+          .trim()
+          .split('\n')
+          .filter(f => f.length > 0);
+      }
       
       // Check if any XML file is QTI 1.2 format
       for (const xmlFile of xmlFiles) {

@@ -328,6 +328,8 @@ ${imageResources}
     }
     const absoluteOutputZip = resolve(outputZip);
 
+    // zip -r appends to an existing archive, which would keep a stale <ident>/ directory
+    rmSync(absoluteOutputZip, { force: true });
     execSync(`cd "${tempDir}" && zip -r "${absoluteOutputZip}" .`, { stdio: 'pipe' });
 
     console.log(`✓ Generated QTI 1.2 Package: ${outputZip}`);

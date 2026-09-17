@@ -64,6 +64,13 @@ const TYPE_MARKER_ALIASES: Record<string, QuestionType> = {
   'fitb': 'fill_in_multiple_blanks',
 };
 
+const CANVAS_KEYS = new Set([
+  'quiz_type', 'time_limit', 'allowed_attempts', 'scoring_policy', 'shuffle_answers',
+  'show_correct_answers', 'one_question_at_a_time', 'cant_go_back', 'access_code', 'description',
+  'require_lockdown_browser', 'require_lockdown_browser_for_results', 'require_lockdown_browser_monitor',
+  'unlock_at', 'due_at', 'lock_at',
+]);
+
 /**
  * Extract inline type markers like [TF], [Essay], [MultiAns], [Match], [FMB] from question title
  * Supports many aliases (case-insensitive): [TF], [TrueFalse], [True/False], [T/F], etc.
@@ -585,6 +592,13 @@ export function parseMarkdown(content: string): ParsedQuiz {
   if (frontMatter) {
     const meta = parseYaml(frontMatter[1]) ?? {};
     if (typeof meta.title === 'string') title = meta.title;
+    if (meta.canvas !== undefined && (typeof meta.canvas !== 'object' || meta.canvas === null || Array.isArray(meta.canvas))) {
+      throw new Error('Front matter: canvas must be a mapping of quiz settings');
+    }
+    const unknownKeys = Object.keys(meta.canvas ?? {}).filter(k => !CANVAS_KEYS.has(k));
+    if (unknownKeys.length > 0) {
+      throw new Error(`Front matter: unknown canvas setting(s): ${unknownKeys.join(', ')}`);
+    }
     if (meta.canvas || typeof meta.description === 'string') {
       canvas = { ...(meta.canvas ?? {}) };
       if (canvas.description === undefined && typeof meta.description === 'string') {

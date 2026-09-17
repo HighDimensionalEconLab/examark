@@ -525,3 +525,52 @@ b) II [correct]
     expect(qti).not.toContain('&lt;/div');
   });
 });
+
+describe('Placeholder restoration', () => {
+  it('does not interpret $-patterns in restored code, math, or fences', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. Shell [1 pts]
+
+Inline \`echo $1 $& $'\` and math $x = \\$1$ then
+
+\`\`\`bash
+echo "pid=$$"
+sed -E "s/x/$&/"
+\`\`\`
+
+a) yes [correct]
+b) no
+`);
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<code>echo $1 $&amp; $\'</code>');
+    expect(qti).toContain('echo "pid=$$"\nsed -E "s/x/$&amp;/"');
+    expect(qti).not.toContain('PLACEHOLDER');
+  });
+});
+
+describe('Figure div removal', () => {
+  it('keeps a literal </div> in code and pairs figure closings with openings', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. What does \`</div>\` close? [1 pts]
+
+<div id="fig-a" class="quarto-figure">
+
+<img src="a.png" />
+
+Figure 1: A.
+
+</div>
+
+a) a block [correct]
+b) an inline \`</div>\` tag
+`);
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<code>&lt;/div&gt;</code>');
+    expect(qti).toContain('<img src="a.png" alt=""/>');
+    expect(qti).toContain('Figure 1: A.');
+    expect(qti).not.toContain('&lt;div');
+    expect(qti).not.toContain('&lt;/div&gt;\n');
+  });
+});

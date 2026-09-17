@@ -784,3 +784,12 @@ c) Third option
   });
 });
 
+
+describe('canvas front matter validation', () => {
+  it('rejects a scalar canvas block', () => {
+    expect(() => parseMarkdown('---\ntitle: T\ncanvas: assignment\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n')).toThrow(/canvas must be a mapping/);
+  });
+  it('rejects unknown keys by name', () => {
+    expect(() => parseMarkdown('---\ncanvas:\n  time_limt: 30\n  quiz_type: assignment\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n')).toThrow(/unknown canvas setting\(s\): time_limt/);
+  });
+});
