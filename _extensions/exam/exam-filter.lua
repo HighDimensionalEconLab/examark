@@ -130,6 +130,15 @@ function Div(el)
   return el
 end
 
+-- Quarto converts ::: {.solution} into its Proof custom node before this
+-- filter runs, so Div above never sees it; hide it here when solutions=false
+function Proof(el)
+  if el.type:lower() == "solution" and exam_options.solutions ~= "true" then
+    return {}
+  end
+  return el
+end
+
 -- Remove vspace when solutions are shown
 function RawBlock(el)
   if exam_options.solutions == "true" then
@@ -280,7 +289,7 @@ end
 return {
   {Meta = Meta},
   {Header = Header},
-  {Div = Div},
+  {Div = Div, Proof = Proof},
   {BulletList = BulletList},
   {Pandoc = Pandoc}
 }
