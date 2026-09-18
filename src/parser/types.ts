@@ -61,6 +61,7 @@ export interface CanvasSettings {
   time_limit?: number;            // minutes
   allowed_attempts?: number;      // -1 = unlimited
   scoring_policy?: 'keep_highest' | 'keep_latest' | 'keep_average';
+  hide_results?: 'always' | 'until_after_last_attempt'; // absent = students see their responses
   shuffle_answers?: boolean;
   show_correct_answers?: boolean;
   one_question_at_a_time?: boolean;

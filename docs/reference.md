@@ -111,7 +111,25 @@ canvas:
 ---
 ```
 
-Every key is optional; Canvas applies its own defaults to keys that are absent.
+Every key is optional. When the file has front matter, absent keys take these
+defaults (a closed-book, one-attempt, LockDown Browser exam); without front matter
+no settings file is written and Canvas applies its own defaults:
+
+| Key | Default |
+|-----|---------|
+| `quiz_type` | `assignment` (graded quiz) |
+| `time_limit` | `50` |
+| `allowed_attempts` | `1` |
+| `shuffle_answers` | `false` |
+| `hide_results` | `always` (students do not see their responses) |
+| `show_correct_answers` | `false` |
+| `one_question_at_a_time` | `true` |
+| `cant_go_back` | `false` |
+| `require_lockdown_browser` | `true` |
+| `require_lockdown_browser_for_results` | `true` |
+
+The assignment group cannot be chosen from the package: Canvas places an imported
+graded quiz in the course's default assignment group.
 The settings are written to `assessment_meta.xml` next to the assessment XML,
 using Canvas's own export layout (`<ident>/<ident>.xml`,
 `<ident>/assessment_meta.xml`, `imsmanifest.xml`, `images/`), which Canvas reads

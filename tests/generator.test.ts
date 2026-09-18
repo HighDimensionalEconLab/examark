@@ -648,3 +648,29 @@ Which one?
     expect(quiz.questions[0].options[1].text).toBe('second continued option text');
   });
 });
+
+describe('Canvas defaults', () => {
+  it('fills absent keys with the exam defaults and keeps explicit values', () => {
+    const quiz = parseMarkdown('---\ntitle: T\ncanvas:\n  time_limit: 90\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    const { assessmentIdent, qti } = generateQTI(quiz);
+    const json = parser.parse(generateAssessmentMeta(quiz, assessmentIdent));
+    expect(json.quiz.quiz_type).toBe('assignment');
+    expect(json.quiz.time_limit).toBe(90);
+    expect(json.quiz.allowed_attempts).toBe(1);
+    expect(json.quiz.shuffle_answers).toBe(false);
+    expect(json.quiz.hide_results).toBe('always');
+    expect(json.quiz.show_correct_answers).toBe(false);
+    expect(json.quiz.one_question_at_a_time).toBe(true);
+    expect(json.quiz.cant_go_back).toBe(false);
+    expect(json.quiz.require_lockdown_browser).toBe(true);
+    expect(json.quiz.require_lockdown_browser_for_results).toBe(true);
+    expect(json.quiz.unlock_at).toBeUndefined();
+    expect(qti).toContain('<fieldlabel>qmd_timelimit</fieldlabel><fieldentry>90</fieldentry>');
+  });
+
+  it('applies the defaults to front matter with no canvas block', () => {
+    const quiz = parseMarkdown('---\ntitle: T\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(quiz.canvas?.require_lockdown_browser).toBe(true);
+    expect(quiz.canvas?.time_limit).toBe(50);
+  });
+});

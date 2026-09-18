@@ -64,8 +64,22 @@ const TYPE_MARKER_ALIASES: Record<string, QuestionType> = {
   'fitb': 'fill_in_multiple_blanks',
 };
 
+// Applied whenever the document has front matter; a canvas: key overrides its default
+export const CANVAS_DEFAULTS: CanvasSettings = {
+  quiz_type: 'assignment',
+  shuffle_answers: false,
+  time_limit: 50,
+  allowed_attempts: 1,
+  hide_results: 'always',
+  show_correct_answers: false,
+  one_question_at_a_time: true,
+  cant_go_back: false,
+  require_lockdown_browser: true,
+  require_lockdown_browser_for_results: true,
+};
+
 const CANVAS_KEYS = new Set([
-  'quiz_type', 'time_limit', 'allowed_attempts', 'scoring_policy', 'shuffle_answers',
+  'quiz_type', 'time_limit', 'allowed_attempts', 'scoring_policy', 'shuffle_answers', 'hide_results',
   'show_correct_answers', 'one_question_at_a_time', 'cant_go_back', 'access_code', 'description',
   'require_lockdown_browser', 'require_lockdown_browser_for_results', 'require_lockdown_browser_monitor',
   'unlock_at', 'due_at', 'lock_at',
@@ -599,11 +613,9 @@ export function parseMarkdown(content: string): ParsedQuiz {
     if (unknownKeys.length > 0) {
       throw new Error(`Front matter: unknown canvas setting(s): ${unknownKeys.join(', ')}`);
     }
-    if (meta.canvas || typeof meta.description === 'string') {
-      canvas = { ...(meta.canvas ?? {}) };
-      if (canvas.description === undefined && typeof meta.description === 'string') {
-        canvas.description = meta.description;
-      }
+    canvas = { ...CANVAS_DEFAULTS, ...(meta.canvas ?? {}) };
+    if (canvas.description === undefined && typeof meta.description === 'string') {
+      canvas.description = meta.description;
     }
     content = content.slice(frontMatter[0].length);
   }

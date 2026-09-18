@@ -748,6 +748,7 @@ export function generateAssessmentMeta(quiz: ParsedQuiz, assessmentIdent: string
   if (canvas.description !== undefined) fields.push(`<description>${escape(canvas.description)}</description>`);
   if (canvas.shuffle_answers !== undefined) fields.push(`<shuffle_answers>${canvas.shuffle_answers}</shuffle_answers>`);
   if (canvas.scoring_policy !== undefined) fields.push(`<scoring_policy>${canvas.scoring_policy}</scoring_policy>`);
+  if (canvas.hide_results !== undefined) fields.push(`<hide_results>${canvas.hide_results}</hide_results>`);
   if (canvas.quiz_type !== undefined) fields.push(`<quiz_type>${canvas.quiz_type}</quiz_type>`);
   fields.push(`<points_possible>${pointsPossible}</points_possible>`);
   if (canvas.show_correct_answers !== undefined) fields.push(`<show_correct_answers>${canvas.show_correct_answers}</show_correct_answers>`);
