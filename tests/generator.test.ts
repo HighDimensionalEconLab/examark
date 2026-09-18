@@ -614,3 +614,37 @@ b) II [correct]
     expect(qti).toContain('<p>Capital of France</p>');
   });
 });
+
+describe('Indented cell output', () => {
+  it('keeps Quarto printed output as a code block, including lines starting with [', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. Moduli [2 pts]
+
+The cell prints the moduli.
+
+\`\`\` python
+print(np.round(np.abs(Lambda), 3))
+\`\`\`
+
+    [0.455 0.945]
+    second line
+
+The plot follows.
+
+![](q_files/figure-commonmark/cell-7-output-1.png)
+
+Which one?
+
+1)  first [correct]
+2)  second
+    continued option text
+`);
+    const stem = quiz.questions[0].stem;
+    expect(stem).toContain('```\n[0.455 0.945]\nsecond line\n```');
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<pre><code class="language-python">print(np.round(np.abs(Lambda), 3))</code></pre>\n<pre><code>[0.455 0.945]\nsecond line</code></pre>\n<p>The plot follows.</p>');
+    expect(quiz.questions[0].options).toHaveLength(2);
+    expect(quiz.questions[0].options[1].text).toBe('second continued option text');
+  });
+});

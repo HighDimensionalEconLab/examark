@@ -738,6 +738,8 @@ export function parseMarkdown(content: string): ParsedQuiz {
   // never mistaken for options, rules, or front matter
   let verbatimClose: RegExp | null = null;
   let verbatimLines: string[] = [];
+  let indentedLines: string[] | null = null;
+  let lastLineBlank = true;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -754,6 +756,25 @@ export function parseMarkdown(content: string): ParsedQuiz {
       }
       continue;
     }
+    // Indented code (Quarto writes cell output this way): gather it, blank lines
+    // included, and append it to the stem as a fence so it stays verbatim
+    if (indentedLines !== null) {
+      if (!trimmed || /^(?: {4}|\t)/.test(line)) {
+        indentedLines.push(line);
+        continue;
+      }
+      while (indentedLines.length > 0 && !indentedLines[indentedLines.length - 1].trim()) indentedLines.pop();
+      const dedented = indentedLines.map(l => l.replace(/^(?: {4}|\t)/, ''));
+      currentQuestion!.stem += '\n\n```\n' + dedented.join('\n') + '\n```';
+      indentedLines = null;
+    }
+    if (currentQuestion && !inSolutionBlock && !inFigureBlock && currentQuestionLines.length === 0
+        && trimmed && /^(?: {4}|\t)/.test(line) && lastLineBlank) {
+      indentedLines = [line];
+      continue;
+    }
+    lastLineBlank = !trimmed;
+
     if (currentQuestion && !inSolutionBlock && !inFigureBlock) {
       const fenceMatch = trimmed.match(/^(`{3,}|~{3,})/);
       if (fenceMatch) {
@@ -992,6 +1013,11 @@ export function parseMarkdown(content: string): ParsedQuiz {
 
   }
   
+  if (indentedLines !== null && currentQuestion) {
+    while (indentedLines.length > 0 && !indentedLines[indentedLines.length - 1].trim()) indentedLines.pop();
+    currentQuestion.stem += '\n\n```\n' + indentedLines.map(l => l.replace(/^(?: {4}|\t)/, '')).join('\n') + '\n```';
+  }
+
   // Finalize last question
   finalizeQuestion();
   
