@@ -78,6 +78,17 @@ export const CANVAS_DEFAULTS: CanvasSettings = {
   require_lockdown_browser_for_results: true,
 };
 
+const CANVAS_VALUE_TYPES: Record<string, string | string[]> = {
+  quiz_type: ['practice_quiz', 'assignment', 'graded_survey', 'survey'],
+  scoring_policy: ['keep_highest', 'keep_latest', 'keep_average'],
+  hide_results: ['always', 'until_after_last_attempt'],
+  time_limit: 'number', allowed_attempts: 'number',
+  shuffle_answers: 'boolean', show_correct_answers: 'boolean', one_question_at_a_time: 'boolean',
+  cant_go_back: 'boolean', require_lockdown_browser: 'boolean',
+  require_lockdown_browser_for_results: 'boolean', require_lockdown_browser_monitor: 'boolean',
+  access_code: 'string', description: 'string', unlock_at: 'string', due_at: 'string', lock_at: 'string',
+};
+
 const CANVAS_KEYS = new Set([
   'quiz_type', 'time_limit', 'allowed_attempts', 'scoring_policy', 'shuffle_answers', 'hide_results',
   'show_correct_answers', 'one_question_at_a_time', 'cant_go_back', 'access_code', 'description',
@@ -425,7 +436,8 @@ function parseOptionsWithFeedback(lines: string[]): { options: AnswerOption[]; g
         // Use newline between pipe-table rows to preserve table structure
         const isTableRow = /^\|.+\|$/.test(trimmed);
         const prevEndsWithTable = /\|$/.test(joinedLines[lastIdx].trimEnd());
-        const sep = (isTableRow || prevEndsWithTable) ? '\n' : ' ';
+        const isBlock = /^(`{3,}|~{3,}|\$\$)/.test(trimmed);
+        const sep = isBlock ? '\n\n' : (isTableRow || prevEndsWithTable) ? '\n' : ' ';
         joinedLines[lastIdx] += sep + trimmed;
       } else {
         joinedLines.push(line);
@@ -462,10 +474,10 @@ function parseOptionsWithFeedback(lines: string[]): { options: AnswerOption[]; g
     const numMatch = trimmed.match(/^(\*)?(\d+)\)\s+(.+)$/s);
     if (numMatch) {
       const hasAsteriskPrefix = !!numMatch[1];
-      const text = numMatch[3];
-      const { cleanText: textWithoutFeedback, feedback } = extractInlineFeedback(text);
+      const [head, ...blocks] = numMatch[3].split('\n\n');
+      const { cleanText: textWithoutFeedback, feedback } = extractInlineFeedback(head);
       const isCorrect = hasAsteriskPrefix || hasCorrectMarker(textWithoutFeedback);
-      const cleanText = cleanCorrectMarkers(textWithoutFeedback);
+      const cleanText = [cleanCorrectMarkers(textWithoutFeedback), ...blocks].join('\n\n');
       lastOption = {
         id: String.fromCharCode(96 + parseInt(numMatch[2])),
         text: cleanText,
@@ -480,10 +492,10 @@ function parseOptionsWithFeedback(lines: string[]): { options: AnswerOption[]; g
     const letterMatch = trimmed.match(/^(\*)?([a-e])\)\s+(.+)$/is);
     if (letterMatch) {
       const hasAsteriskPrefix = !!letterMatch[1];
-      const text = letterMatch[3];
-      const { cleanText: textWithoutFeedback, feedback } = extractInlineFeedback(text);
+      const [head, ...blocks] = letterMatch[3].split('\n\n');
+      const { cleanText: textWithoutFeedback, feedback } = extractInlineFeedback(head);
       const isCorrect = hasAsteriskPrefix || hasCorrectMarker(textWithoutFeedback) || textWithoutFeedback.startsWith('*');
-      const cleanText = cleanCorrectMarkers(textWithoutFeedback).replace(/^\*/, '').trim();
+      const cleanText = [cleanCorrectMarkers(textWithoutFeedback).replace(/^\*/, '').trim(), ...blocks].join('\n\n');
       lastOption = {
         id: letterMatch[2].toLowerCase(),
         text: cleanText,
@@ -599,6 +611,7 @@ function parseBlanks(stem: string, lines: string[]): BlankAnswer[] {
 export function parseMarkdown(content: string): ParsedQuiz {
   let title = 'Quiz';
   let canvas: CanvasSettings | undefined;
+  let frontMatterLines = 0;
 
   // YAML front matter (Quarto's gfm+yaml_metadata_block writer emits the
   // document metadata here): title, canvas quiz settings, description
@@ -613,10 +626,31 @@ export function parseMarkdown(content: string): ParsedQuiz {
     if (unknownKeys.length > 0) {
       throw new Error(`Front matter: unknown canvas setting(s): ${unknownKeys.join(', ')}`);
     }
-    canvas = { ...CANVAS_DEFAULTS, ...(meta.canvas ?? {}) };
-    if (canvas.description === undefined && typeof meta.description === 'string') {
-      canvas.description = meta.description;
+    if (/[`*]/.test(title)) {
+      throw new Error('Front matter: title must be plain text (no backticks or asterisks); it becomes an XML attribute');
     }
+    const given = meta.canvas ?? {};
+    const settings: CanvasSettings = { ...CANVAS_DEFAULTS, ...given };
+    for (const [key, value] of Object.entries(given)) {
+      const expected = CANVAS_VALUE_TYPES[key];
+      const ok = value === null ? key === 'hide_results'
+        : Array.isArray(expected) ? expected.includes(value as string)
+        : typeof value === expected;
+      if (!ok) {
+        throw new Error(`Front matter: canvas.${key} must be ${Array.isArray(expected) ? 'one of ' + expected.join(', ') : 'a ' + expected}, got ${JSON.stringify(value)}`);
+      }
+    }
+    // Canvas shows correct answers only when it also shows responses, so an
+    // explicit show_correct_answers drops the hide_results default; a literal
+    // null removes the element
+    if (given.hide_results === null || (settings.show_correct_answers && given.hide_results === undefined)) {
+      delete settings.hide_results;
+    }
+    if (settings.description === undefined && typeof meta.description === 'string') {
+      settings.description = meta.description;
+    }
+    canvas = settings;
+    frontMatterLines = frontMatter[0].split('\n').length - 1;
     content = content.slice(frontMatter[0].length);
   }
 
@@ -761,7 +795,12 @@ export function parseMarkdown(content: string): ParsedQuiz {
       verbatimLines.push(line);
       if (verbatimClose.test(trimmed)) {
         verbatimClose = null;
-        if (currentQuestion) {
+        if (currentQuestionLines.length > 0) {
+          // Belongs to the option being read (Quarto indents it inside the list item)
+          const indents = verbatimLines.filter(l => l.trim()).map(l => l.match(/^[ \t]*/)![0].length);
+          const indent = Math.min(...indents);
+          currentQuestionLines.push(verbatimLines.map(l => l.slice(indent)).join('\n'));
+        } else if (currentQuestion) {
           currentQuestion.stem += '\n\n' + verbatimLines.join('\n');
         }
         verbatimLines = [];
@@ -796,7 +835,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
       }
       if (trimmed.startsWith('$$') && !trimmed.slice(2).includes('$$')) {
         verbatimClose = /\$\$/;
-        verbatimLines = [trimmed];
+        verbatimLines = [line];
         continue;
       }
     }
@@ -929,7 +968,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
       }
 
       questionCounter++;
-      currentQuestionLine = i + 1; // Store 1-indexed line number
+      currentQuestionLine = frontMatterLines + i + 1; // 1-indexed line in the original file
 
       // Prepend any pending figure to the question stem
       if (pendingFigure) {
@@ -1015,7 +1054,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
           // Regular description text or image for stem
           // Use single newline between consecutive pipe-table rows to preserve table structure
           const isTableRow = /^\|.+\|$/.test(trimmed);
-          const stemEndsWithTableRow = /\|$/.test(currentQuestion.stem.trimEnd());
+          const stemEndsWithTableRow = /\|$/.test((currentQuestion.stem ?? '').trimEnd());
           const separator = (isTableRow && stemEndsWithTableRow) ? '\n' : '\n\n';
           currentQuestion.stem += separator + trimmed;
         }

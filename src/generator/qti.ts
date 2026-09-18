@@ -288,6 +288,11 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver, par
   return result;
 }
 
+/** Plain XML escaping for attribute values and non-HTML elements */
+function escapeXml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 /**
  * Map internal question type to Canvas QTI type
  */
@@ -325,11 +330,11 @@ function generateOptionsWithIds(options: AnswerOption[], questionSeed: string): 
 /**
  * Generate answer options XML
  */
-function generateOptionsXml(generatedOptions: GeneratedOption[]): string {
+function generateOptionsXml(generatedOptions: GeneratedOption[], imageResolver?: ImageResolver): string {
   return generatedOptions.map(({ ident, option }) =>
     `<response_label ident="${ident}">` +
     `<material>` +
-    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(option.text)}</mattext>` +
+    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(option.text, imageResolver)}</mattext>` +
     `</material>` +
     `</response_label>`
   ).join('');
@@ -366,11 +371,11 @@ function generateMatchingPresentation(stem: string, matchPairs: MatchPair[], que
 
     // Each left item has its own response_lid with all right items as choices
     responsesXml += `<response_lid ident="${leftId}">` +
-      `<material><mattext texttype="text/html">${escapeXmlPreserveLaTeX(pair.left)}</mattext></material>` +
+      `<material><mattext texttype="text/html">${escapeXmlPreserveLaTeX(pair.left, imageResolver)}</mattext></material>` +
       `<render_choice>` +
       rightItems.map(r =>
         `<response_label ident="${r.id}">` +
-        `<material><mattext texttype="text/html">${escapeXmlPreserveLaTeX(r.text)}</mattext></material>` +
+        `<material><mattext texttype="text/html">${escapeXmlPreserveLaTeX(r.text, imageResolver)}</mattext></material>` +
         `</response_label>`
       ).join('') +
       `</render_choice>` +
@@ -420,7 +425,7 @@ function generateFMBPresentation(stem: string, blanks: BlankAnswer[], questionSe
 /**
  * Generate feedback XML for options and general feedback
  */
-function generateFeedbackXml(question: Question, generatedOptions: GeneratedOption[]): string {
+function generateFeedbackXml(question: Question, generatedOptions: GeneratedOption[], imageResolver?: ImageResolver): string {
   let feedbackXml = '';
 
   // Per-option feedback
@@ -428,7 +433,7 @@ function generateFeedbackXml(question: Question, generatedOptions: GeneratedOpti
     if (option.feedback) {
       feedbackXml += `<itemfeedback ident="${ident}_fb">` +
         `<flow_mat><material>` +
-        `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(option.feedback)}</mattext>` +
+        `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(option.feedback, imageResolver)}</mattext>` +
         `</material></flow_mat>` +
         `</itemfeedback>`;
     }
@@ -438,7 +443,7 @@ function generateFeedbackXml(question: Question, generatedOptions: GeneratedOpti
   if (question.generalFeedback) {
     feedbackXml += `<itemfeedback ident="general_fb">` +
       `<flow_mat><material>` +
-      `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(question.generalFeedback)}</mattext>` +
+      `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(question.generalFeedback, imageResolver)}</mattext>` +
       `</material></flow_mat>` +
       `</itemfeedback>`;
   }
@@ -679,13 +684,13 @@ function generateQuestionXml(question: Question, imageResolver?: ImageResolver):
       `</material>` +
       `<response_lid ident="response1" rcardinality="${cardinality}">` +
       `<render_choice>` +
-      `${generateOptionsXml(generatedOptions)}` +
+      `${generateOptionsXml(generatedOptions, imageResolver)}` +
       `</render_choice>` +
       `</response_lid>`;
   }
 
   // Generate feedback if present
-  const feedbackXml = generateFeedbackXml(question, generatedOptions);
+  const feedbackXml = generateFeedbackXml(question, generatedOptions, imageResolver);
 
   return `<item ident="${itemIdent}" title="Question">` +
     `${generateItemMetadata(question, qType, generatedOptions, questionRef)}` +
@@ -723,7 +728,7 @@ export function generateQTI(quiz: ParsedQuiz, imageResolver?: ImageResolver): { 
     `<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2" ` +
     `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ` +
     `xsi:schemaLocation="http://www.imsglobal.org/xsd/ims_qtiasiv1p2 http://www.imsglobal.org/xsd/ims_qtiasiv1p2p1.xsd">` +
-    `<assessment ident="${assessmentIdent}" title="${escapeXmlPreserveLaTeX(quiz.title)}">` +
+    `<assessment ident="${assessmentIdent}" title="${escapeXml(quiz.title)}">` +
     `<qtimetadata>${assessmentMetadata}</qtimetadata>` +
     `<section ident="root_section">` +
     `${allQuestionsXml}` +
@@ -741,14 +746,14 @@ export function generateQTI(quiz: ParsedQuiz, imageResolver?: ImageResolver): { 
  */
 export function generateAssessmentMeta(quiz: ParsedQuiz, assessmentIdent: string): string {
   const canvas = quiz.canvas ?? {};
-  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escape = escapeXml;
   const pointsPossible = quiz.questions.reduce((sum, q) => sum + q.points, 0);
 
   const fields: string[] = [`<title>${escape(quiz.title)}</title>`];
   if (canvas.description !== undefined) fields.push(`<description>${escape(canvas.description)}</description>`);
   if (canvas.shuffle_answers !== undefined) fields.push(`<shuffle_answers>${canvas.shuffle_answers}</shuffle_answers>`);
   if (canvas.scoring_policy !== undefined) fields.push(`<scoring_policy>${canvas.scoring_policy}</scoring_policy>`);
-  if (canvas.hide_results !== undefined) fields.push(`<hide_results>${canvas.hide_results}</hide_results>`);
+  if (canvas.hide_results != null) fields.push(`<hide_results>${canvas.hide_results}</hide_results>`);
   if (canvas.quiz_type !== undefined) fields.push(`<quiz_type>${canvas.quiz_type}</quiz_type>`);
   fields.push(`<points_possible>${pointsPossible}</points_possible>`);
   if (canvas.show_correct_answers !== undefined) fields.push(`<show_correct_answers>${canvas.show_correct_answers}</show_correct_answers>`);
@@ -758,8 +763,8 @@ export function generateAssessmentMeta(quiz: ParsedQuiz, assessmentIdent: string
   if (canvas.cant_go_back !== undefined) fields.push(`<cant_go_back>${canvas.cant_go_back}</cant_go_back>`);
   if (canvas.access_code !== undefined) fields.push(`<access_code>${escape(canvas.access_code)}</access_code>`);
   if (canvas.require_lockdown_browser !== undefined) fields.push(`<require_lockdown_browser>${canvas.require_lockdown_browser}</require_lockdown_browser>`);
-  if (canvas.require_lockdown_browser_for_results !== undefined) fields.push(`<require_lockdown_browser_for_results>${canvas.require_lockdown_browser_for_results}</require_lockdown_browser_for_results>`);
-  if (canvas.require_lockdown_browser_monitor !== undefined) fields.push(`<require_lockdown_browser_monitor>${canvas.require_lockdown_browser_monitor}</require_lockdown_browser_monitor>`);
+  if (canvas.require_lockdown_browser && canvas.require_lockdown_browser_for_results !== undefined) fields.push(`<require_lockdown_browser_for_results>${canvas.require_lockdown_browser_for_results}</require_lockdown_browser_for_results>`);
+  if (canvas.require_lockdown_browser && canvas.require_lockdown_browser_monitor !== undefined) fields.push(`<require_lockdown_browser_monitor>${canvas.require_lockdown_browser_monitor}</require_lockdown_browser_monitor>`);
   if (canvas.unlock_at !== undefined) fields.push(`<unlock_at>${escape(String(canvas.unlock_at))}</unlock_at>`);
   if (canvas.due_at !== undefined) fields.push(`<due_at>${escape(String(canvas.due_at))}</due_at>`);
   if (canvas.lock_at !== undefined) fields.push(`<lock_at>${escape(String(canvas.lock_at))}</lock_at>`);

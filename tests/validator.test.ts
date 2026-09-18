@@ -595,3 +595,21 @@ ${ok ? '<resprocessing><outcomes><decvar maxvalue="100" minvalue="0" varname="SC
     expect(report.isValid).toBe(true);
   });
 });
+
+describe('QtiValidator code operators', () => {
+  it('does not warn about comparison operators inside code blocks', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'qti-code-'));
+    writeFileSync(join(dir, 'q.xml'), `<?xml version="1.0" encoding="UTF-8"?>
+<questestinterop xmlns="http://www.imsglobal.org/xsd/ims_qtiasiv1p2"><assessment ident="x" title="T"><qtimetadata></qtimetadata><section ident="root_section">
+<item ident="i" title="Question"><itemmetadata><qtimetadata><qtimetadatafield><fieldlabel>question_type</fieldlabel><fieldentry>multiple_choice_question</fieldentry></qtimetadatafield></qtimetadata></itemmetadata>
+<presentation><material><mattext texttype="text/html"><p>What prints here for a small value?</p><pre><code>print(rho &lt; 1)</code></pre></mattext></material><response_lid ident="response1" rcardinality="Single"><render_choice>
+<response_label ident="a"><material><mattext texttype="text/html">True</mattext></material></response_label>
+<response_label ident="b"><material><mattext texttype="text/html">False</mattext></material></response_label></render_choice></response_lid></presentation>
+<resprocessing><outcomes><decvar maxvalue="100" minvalue="0" varname="SCORE" vartype="Decimal"/></outcomes><respcondition continue="No"><conditionvar><varequal respident="response1">a</varequal></conditionvar><setvar actoin="Set" varname="SCORE">100</setvar></respcondition></resprocessing>
+</item></section></assessment></questestinterop>`);
+    const report = await new QtiValidator().validatePackage(dir);
+    rmSync(dir, { recursive: true, force: true });
+    expect(report.isValid).toBe(true);
+    expect(report.warnings.filter(w => w.includes('Unescaped comparison operator'))).toEqual([]);
+  });
+});

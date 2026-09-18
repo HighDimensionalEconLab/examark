@@ -674,3 +674,82 @@ describe('Canvas defaults', () => {
     expect(quiz.canvas?.time_limit).toBe(50);
   });
 });
+
+describe('Review round 2', () => {
+  it('omits hide_results when correct answers are shown, and on explicit null', () => {
+    const shown = parseMarkdown('---\ntitle: T\ncanvas:\n  show_correct_answers: true\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(shown.canvas?.hide_results).toBeUndefined();
+    expect(generateAssessmentMeta(shown, 'id')).not.toContain('hide_results');
+    const nulled = parseMarkdown('---\ntitle: T\ncanvas:\n  hide_results: null\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(generateAssessmentMeta(nulled, 'id')).not.toContain('hide_results');
+    const hidden = parseMarkdown('---\ntitle: T\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(generateAssessmentMeta(hidden, 'id')).toContain('<hide_results>always</hide_results>');
+  });
+
+  it('rejects markdown in the title and escapes it plainly', () => {
+    expect(() => parseMarkdown('---\ntitle: "Quiz on `numpy`"\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n')).toThrow(/title must be plain text/);
+    const quiz = parseMarkdown('---\ntitle: "A & B <2>"\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('title="A &amp; B &lt;2&gt;"');
+    expect(() => parser.parse(qti)).not.toThrow();
+  });
+
+  it('rejects bad canvas values by name', () => {
+    expect(() => parseMarkdown('---\ncanvas:\n  time_limit: fifty\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n')).toThrow(/canvas.time_limit must be a number/);
+    expect(() => parseMarkdown('---\ncanvas:\n  quiz_type: exam\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n')).toThrow(/canvas.quiz_type must be one of/);
+  });
+
+  it('emits lockdown sub-settings only when the browser is required', () => {
+    const off = parseMarkdown('---\ncanvas:\n  require_lockdown_browser: false\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(generateAssessmentMeta(off, 'id')).not.toContain('require_lockdown_browser_for_results');
+    const on = parseMarkdown('---\ntitle: T\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\nb) y\n');
+    expect(generateAssessmentMeta(on, 'id')).toContain('<require_lockdown_browser_for_results>true</require_lockdown_browser_for_results>');
+  });
+
+  it('resolves images in options and feedback', () => {
+    const quiz = parseMarkdown('# Q\n\n## 1. Which plot decays? [1 pts]\n\na) ![first](a.png) [correct] // See ![hint](h.png)\nb) ![second](b.png)\n');
+    const seen: string[] = [];
+    const { qti } = generateQTI(quiz, src => { seen.push(src); return `images/${src}`; });
+    expect(seen.sort()).toEqual(['a.png', 'b.png', 'h.png']);
+    expect(qti).toContain('<img src="images/a.png" alt="first"/>');
+    expect(qti).toContain('<img src="images/h.png" alt="hint"/>');
+  });
+
+  it('keeps a code block and display math inside an option, Quarto list-item shape', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. Which snippet is right? [2 pts]
+
+Pick one.
+
+1)  This one: [correct]
+
+    \`\`\` python
+    y = x // 2  # floor
+    \`\`\`
+
+2)  Or this, with $x \\in \\mathbb{R}$:
+
+    $$
+    y = \\frac{x}{2}
+    $$
+
+3)  Neither
+`);
+    const q = quiz.questions[0];
+    expect(q.stem).toBe('Which snippet is right?\n\nPick one.');
+    expect(q.options).toHaveLength(3);
+    expect(q.options[0].isCorrect).toBe(true);
+    expect(q.options[0].feedback).toBeUndefined();
+    expect(q.options[0].text).toBe('This one:\n\n``` python\ny = x // 2  # floor\n```');
+    expect(q.options[1].text).toBe('Or this, with $x \\in \\mathbb{R}$:\n\n$$\ny = \\frac{x}{2}\n$$');
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('This one:\n\n<pre><code class="language-python">y = x // 2  # floor</code></pre></mattext>');
+    expect(qti).toContain('Or this, with \\(x \\in \\mathbb{R}\\):\n\n\\[\ny = \\frac{x}{2}\n\\]</mattext>');
+  });
+
+  it('reports source lines relative to the original file', () => {
+    const quiz = parseMarkdown('---\ntitle: T\ncanvas:\n  time_limit: 10\n---\n\n## 1. Q [1 pts]\n\na) x [correct]\n');
+    expect(quiz.questions[0].sourceLine).toBe(7);
+  });
+});

@@ -506,13 +506,16 @@ export class QtiValidator {
       const material = item.presentation.material;
       const mattext = material?.mattext;
       // Text nested inside <p>, <code>, etc. counts as stem text
-      const textOf = (node: any): string => {
+      const textOf = (node: any, skipCode = false): string => {
         if (node === undefined || node === null) return '';
         if (typeof node !== 'object') return String(node);
-        if (Array.isArray(node)) return node.map(textOf).join(' ');
-        return Object.entries(node).filter(([k]) => !k.startsWith('@_')).map(([, v]) => textOf(v)).join(' ');
+        if (Array.isArray(node)) return node.map(n => textOf(n, skipCode)).join(' ');
+        return Object.entries(node)
+          .filter(([k]) => !k.startsWith('@_') && !(skipCode && (k === 'pre' || k === 'code')))
+          .map(([, v]) => textOf(v, skipCode)).join(' ');
       };
       const parsedText = textOf(mattext);
+      const proseText = textOf(mattext, true); // comparison operators inside code are fine
 
       // Always use parsed text for validation (raw HTML was only for pre-scan statistics)
       const questionText = parsedText;
@@ -538,8 +541,8 @@ export class QtiValidator {
       }
 
       // Check for unescaped comparison operators (specific error reporting)
-      const hasRawLt = questionText.match(/<(?![/a-zA-Z])/); // < not followed by tag
-      const hasRawGt = questionText.match(/(?<![a-zA-Z])>/); // > not preceded by tag
+      const hasRawLt = proseText.match(/<(?![/a-zA-Z])/); // < not followed by tag
+      const hasRawGt = proseText.match(/(?<![a-zA-Z])>/); // > not preceded by tag
       if (hasRawLt || hasRawGt) {
         report.warnings.push(`Item ${itemIdent}: Unescaped comparison operator detected - may render incorrectly in Canvas`);
       }
