@@ -505,7 +505,14 @@ export class QtiValidator {
       // Check for question text (mattext)
       const material = item.presentation.material;
       const mattext = material?.mattext;
-      const parsedText = typeof mattext === 'string' ? mattext : mattext?.['#text'] || '';
+      // Text nested inside <p>, <code>, etc. counts as stem text
+      const textOf = (node: any): string => {
+        if (node === undefined || node === null) return '';
+        if (typeof node !== 'object') return String(node);
+        if (Array.isArray(node)) return node.map(textOf).join(' ');
+        return Object.entries(node).filter(([k]) => !k.startsWith('@_')).map(([, v]) => textOf(v)).join(' ');
+      };
+      const parsedText = textOf(mattext);
 
       // Always use parsed text for validation (raw HTML was only for pre-scan statistics)
       const questionText = parsedText;

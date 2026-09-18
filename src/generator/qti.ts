@@ -124,7 +124,7 @@ export function convertMarkdownTablesToHtml(text: string): string {
  * Canvas expects \(...\) for inline and \[...\] for display math
  * Also converts markdown images to HTML img tags with optional base64 embedding
  */
-function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): string {
+function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver, paragraphs = false): string {
   // Fenced code blocks first: their content is verbatim, so nothing below
   // (inline code, math, bold, tables) may touch it
   const fences: string[] = [];
@@ -246,6 +246,19 @@ function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver): st
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
+  // Question stems: blank-line-separated blocks become <p> so Canvas shows the
+  // title, text, image, and caption on their own lines. Fences and tables are
+  // block-level already; images get a block of their own
+  if (paragraphs) {
+    result = result.replace(/__IMG_PLACEHOLDER_(\d+)__/g, '\n\n$&\n\n');
+    result = result
+      .split(/\n[ \t]*\n/)
+      .map(block => block.trim())
+      .filter(block => block.length > 0)
+      .map(block => /^__(FENCE|TABLE)_PLACEHOLDER_\d+__$/.test(block) ? block : `<p>${block}</p>`)
+      .join('\n');
+  }
+
   // Restore in reverse extraction order: outer containers first, inner content last.
   // Tables may contain LaTeX/HTML/code placeholders, so restore tables first.
   tables.forEach((table, i) => {
@@ -365,7 +378,7 @@ function generateMatchingPresentation(stem: string, matchPairs: MatchPair[], que
   });
 
   const xml = `<material>` +
-    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(stem, imageResolver)}</mattext>` +
+    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(stem, imageResolver, true)}</mattext>` +
     `</material>` +
     responsesXml;
 
@@ -397,7 +410,7 @@ function generateFMBPresentation(stem: string, blanks: BlankAnswer[], questionSe
   });
 
   const xml = `<material>` +
-    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(stem, imageResolver)}</mattext>` +
+    `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(stem, imageResolver, true)}</mattext>` +
     `</material>` +
     responsesXml;
 
@@ -650,7 +663,7 @@ function generateQuestionXml(question: Question, imageResolver?: ImageResolver):
   } else if (question.type === 'essay' || question.type === 'short_answer') {
     // Essay/Short answer
     presentationContent = `<material>` +
-      `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(question.stem, imageResolver)}</mattext>` +
+      `<mattext texttype="text/html">${escapeXmlPreserveLaTeX(question.stem, imageResolver, true)}</mattext>` +
       `</material>` +
       `<response_str ident="response1" rcardinality="Single">` +
       `<render_fib>` +
@@ -660,7 +673,7 @@ function generateQuestionXml(question: Question, imageResolver?: ImageResolver):
   } else {
     // Multiple choice, multiple answers, true/false
     const cardinality = question.type === 'multiple_answers' ? 'Multiple' : 'Single';
-    const escapedStem = escapeXmlPreserveLaTeX(question.stem, imageResolver);
+    const escapedStem = escapeXmlPreserveLaTeX(question.stem, imageResolver, true);
     presentationContent = `<material>` +
       `<mattext texttype="text/html">${escapedStem}</mattext>` +
       `</material>` +

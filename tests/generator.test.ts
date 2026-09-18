@@ -574,3 +574,43 @@ b) an inline \`</div>\` tag
     expect(qti).not.toContain('&lt;/div&gt;\n');
   });
 });
+
+describe('Stem paragraphs', () => {
+  it('wraps title, text, image, and caption in their own <p>, leaves fences bare', () => {
+    const quiz = parseMarkdown(`# Q
+
+## 1. Spectral radius from a plot [2 pts]
+
+The figure shows the norms.
+
+\`\`\`python
+print(1)
+\`\`\`
+
+<div id="fig-norms">
+
+<img src="a.png"
+id="fig-norms" />
+
+Figure 1: Norms.
+
+</div>
+
+Which matrix grows?
+
+a) I
+b) II [correct]
+`);
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<p>Spectral radius from a plot</p>\n<p>The figure shows the norms.</p>\n<pre><code class="language-python">print(1)</code></pre>\n<p><img src="a.png" alt=""/></p>\n<p>Figure 1: Norms.</p>\n<p>Which matrix grows?</p>');
+    expect(qti).toContain('<mattext texttype="text/html">I</mattext>');
+    expect(qti).toContain('<mattext texttype="text/html">II</mattext>');
+  });
+
+  it('does not wrap short-answer match strings', () => {
+    const quiz = parseMarkdown('# Q\n\n## 1. [Short] Capital of France [1 pts]\n\nAnswer: Paris\n');
+    const { qti } = generateQTI(quiz);
+    expect(qti).toContain('<varequal respident="response1">Paris</varequal>');
+    expect(qti).toContain('<p>Capital of France</p>');
+  });
+});
