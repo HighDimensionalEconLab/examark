@@ -68,6 +68,39 @@ function Meta(meta)
   return meta
 end
 
+-- Markdown output keeps the [correct] and → True/False markers for examark;
+-- every other student-facing format drops them
+local function keep_answer_markers()
+  return exam_options.solutions == "true"
+    or quarto.doc.is_format("gfm") or quarto.doc.is_format("markdown")
+end
+
+-- Strip a trailing [correct] from each answer choice
+local function strip_correct(el)
+  if keep_answer_markers() then
+    return el
+  end
+  for _, item in ipairs(el.content) do
+    for _, block in ipairs(item) do
+      if block.t == "Plain" or block.t == "Para" then
+        local inlines = block.content
+        if #inlines > 0 and inlines[#inlines].t == "Str"
+            and inlines[#inlines].text == "[correct]" then
+          inlines:remove(#inlines)
+          while #inlines > 0 and inlines[#inlines].t == "Space" do
+            inlines:remove(#inlines)
+          end
+        end
+      end
+    end
+  end
+  return el
+end
+
+function OrderedList(el)
+  return strip_correct(el)
+end
+
 -- Process headers (questions and sections)
 function Header(el)
   -- Section headers (# = level 1)
@@ -95,6 +128,14 @@ function Header(el)
     if tf_answer then
       el.attributes["data-answer"] = tf_answer:lower()
       el.classes:insert("tf-question")
+      if not keep_answer_markers() then
+        local content = el.content
+        content:remove(#content)
+        while #content > 0 and (content[#content].t == "Space"
+            or (content[#content].t == "Str" and content[#content].text == "→")) do
+          content:remove(#content)
+        end
+      end
     end
     
     return el
@@ -185,7 +226,7 @@ function BulletList(el)
     el.classes:insert("answer-choices")
   end
   
-  return el
+  return strip_correct(el)
 end
 
 -- Generate QTI package if exam.qti is enabled
@@ -290,6 +331,6 @@ return {
   {Meta = Meta},
   {Header = Header},
   {Div = Div, Proof = Proof},
-  {BulletList = BulletList},
+  {BulletList = BulletList, OrderedList = OrderedList},
   {Pandoc = Pandoc}
 }
