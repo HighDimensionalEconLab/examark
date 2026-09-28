@@ -788,6 +788,18 @@ export function parseMarkdown(content: string): ParsedQuiz {
   let verbatimLines: string[] = [];
   let indentedLines: string[] | null = null;
   let lastLineBlank = true;
+  const endVerbatim = () => {
+    verbatimClose = null;
+    if (currentQuestionLines.length > 0) {
+      // Belongs to the option being read (Quarto indents it inside the list item)
+      const indents = verbatimLines.filter(l => l.trim()).map(l => l.match(/^[ \t]*/)![0].length);
+      const indent = Math.min(...indents);
+      currentQuestionLines.push(verbatimLines.map(l => l.slice(indent)).join('\n'));
+    } else if (currentQuestion) {
+      currentQuestion.stem += '\n\n' + verbatimLines.join('\n');
+    }
+    verbatimLines = [];
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -795,18 +807,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
 
     if (verbatimClose) {
       verbatimLines.push(line);
-      if (verbatimClose.test(trimmed)) {
-        verbatimClose = null;
-        if (currentQuestionLines.length > 0) {
-          // Belongs to the option being read (Quarto indents it inside the list item)
-          const indents = verbatimLines.filter(l => l.trim()).map(l => l.match(/^[ \t]*/)![0].length);
-          const indent = Math.min(...indents);
-          currentQuestionLines.push(verbatimLines.map(l => l.slice(indent)).join('\n'));
-        } else if (currentQuestion) {
-          currentQuestion.stem += '\n\n' + verbatimLines.join('\n');
-        }
-        verbatimLines = [];
-      }
+      if (verbatimClose.test(trimmed)) endVerbatim();
       continue;
     }
     // Indented code (Quarto writes cell output this way): gather it, blank lines
@@ -838,6 +839,13 @@ export function parseMarkdown(content: string): ParsedQuiz {
       if (trimmed.startsWith('$$') && !trimmed.slice(2).includes('$$')) {
         verbatimClose = /\$\$/;
         verbatimLines = [line];
+        continue;
+      }
+      // Raw <pre> HTML (the Quarto exam filter emits highlighted code this way)
+      if (trimmed.startsWith('<pre')) {
+        verbatimClose = /<\/pre>$/;
+        verbatimLines = [line];
+        if (verbatimClose.test(trimmed)) endVerbatim();
         continue;
       }
     }

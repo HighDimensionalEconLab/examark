@@ -125,10 +125,16 @@ export function convertMarkdownTablesToHtml(text: string): string {
  * Also converts markdown images to HTML img tags with optional base64 embedding
  */
 function escapeXmlPreserveLaTeX(text: string, imageResolver?: ImageResolver, paragraphs = false): string {
-  // Fenced code blocks first: their content is verbatim, so nothing below
-  // (inline code, math, bold, tables) may touch it
+  // Code blocks first: their content is verbatim, so nothing below
+  // (inline code, math, bold, tables) may touch it. Raw <pre> HTML is already
+  // Canvas-ready (the Quarto exam filter emits highlighted code this way)
   const fences: string[] = [];
-  let result = text.replace(
+  let result = text.replace(/<pre\b[\s\S]*?<\/pre>/g, (match) => {
+    const placeholder = `__FENCE_PLACEHOLDER_${fences.length}__`;
+    fences.push(match);
+    return placeholder;
+  });
+  result = result.replace(
     /^[ \t]*(`{3,}|~{3,})[ \t]*([\w+.-]*)[^\n]*\n([\s\S]*?)\n[ \t]*\1[ \t]*$/gm,
     (match, fence, lang, code) => {
       const placeholder = `__FENCE_PLACEHOLDER_${fences.length}__`;

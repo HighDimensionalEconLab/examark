@@ -180,6 +180,61 @@ function Proof(el)
   return el
 end
 
+-- Canvas keeps inline styles but strips stylesheets, so markdown output carries
+-- every code block as raw HTML with pandoc's pygments highlight colors inlined
+-- on each token span (color only: Canvas drops font-weight)
+local token_colors = {
+  kw = "#007020", cf = "#007020", ot = "#007020",
+  dt = "#902000",
+  dv = "#40a070", bn = "#40a070", fl = "#40a070",
+  ch = "#4070a0", st = "#4070a0", sc = "#4070a0", vs = "#4070a0",
+  ss = "#bb6688",
+  co = "#60a0b0", an = "#60a0b0", cv = "#60a0b0", wa = "#60a0b0", ["in"] = "#60a0b0",
+  al = "#ff0000", er = "#ff0000",
+  fu = "#06287e",
+  cn = "#880000",
+  im = "#008000", bu = "#008000",
+  va = "#19177c",
+  op = "#666666",
+  pp = "#bc7a00",
+  at = "#7d9029",
+  ["do"] = "#ba2121",
+}
+
+local code_block_style = "background-color: #f8f8f8; border: 1px solid #ddd; "
+  .. "border-radius: 4px; padding: 8px 12px; white-space: pre; overflow-x: auto;"
+
+function CodeBlock(el)
+  if not quarto.doc.is_format("gfm") then
+    return el
+  end
+  local attr = {}
+  for _, class in ipairs(el.classes) do
+    if not class:match("^cell%-") then
+      attr = {class = class}
+      break
+    end
+  end
+  local html = pandoc.write(pandoc.Pandoc({pandoc.CodeBlock(el.text, attr)}), "html")
+  local body = html:match("<code[^>]*>(.-)</code>")
+  local lines = {}
+  for line in (body .. "\n"):gmatch("(.-)\n") do
+    -- Each highlighted line is wrapped in <span id="cbN-M"><a ...></a>...</span>
+    local wrapped
+    line, wrapped = line:gsub('^<span id="cb%d+%-%d+"><a [^>]*></a>', "")
+    if wrapped > 0 then
+      line = line:gsub("</span>$", "")
+    end
+    line = line:gsub('<span class="(%w+)">', function(class)
+      local color = token_colors[class]
+      return color and ('<span style="color: ' .. color .. '">') or "<span>"
+    end)
+    lines[#lines + 1] = line
+  end
+  return pandoc.RawBlock("html", '<pre style="' .. code_block_style .. '"><code>'
+    .. table.concat(lines, "\n") .. "</code></pre>")
+end
+
 -- Remove vspace when solutions are shown
 function RawBlock(el)
   if exam_options.solutions == "true" then
@@ -330,7 +385,7 @@ end
 return {
   {Meta = Meta},
   {Header = Header},
-  {Div = Div, Proof = Proof},
+  {Div = Div, Proof = Proof, CodeBlock = CodeBlock},
   {BulletList = BulletList, OrderedList = OrderedList},
   {Pandoc = Pandoc}
 }
