@@ -124,7 +124,7 @@ no settings file is written and Canvas applies its own defaults:
 | `shuffle_answers` | `false` |
 | `hide_results` | `always` (students do not see their responses) |
 | `show_correct_answers` | `false` |
-| `one_question_at_a_time` | `true` |
+| `one_question_at_a_time` | `false` |
 | `cant_go_back` | `false` |
 | `require_lockdown_browser` | `true` |
 | `require_lockdown_browser_for_results` | `true` |

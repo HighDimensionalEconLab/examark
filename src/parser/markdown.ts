@@ -72,7 +72,7 @@ export const CANVAS_DEFAULTS: CanvasSettings = {
   allowed_attempts: 1,
   hide_results: 'always',
   show_correct_answers: false,
-  one_question_at_a_time: true,
+  one_question_at_a_time: false,
   cant_go_back: false,
   require_lockdown_browser: true,
   require_lockdown_browser_for_results: true,

@@ -660,7 +660,7 @@ describe('Canvas defaults', () => {
     expect(json.quiz.shuffle_answers).toBe(false);
     expect(json.quiz.hide_results).toBe('always');
     expect(json.quiz.show_correct_answers).toBe(false);
-    expect(json.quiz.one_question_at_a_time).toBe(true);
+    expect(json.quiz.one_question_at_a_time).toBe(false);
     expect(json.quiz.cant_go_back).toBe(false);
     expect(json.quiz.require_lockdown_browser).toBe(true);
     expect(json.quiz.require_lockdown_browser_for_results).toBe(true);
