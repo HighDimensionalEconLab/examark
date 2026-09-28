@@ -181,27 +181,28 @@ function Proof(el)
 end
 
 -- Canvas keeps inline styles but strips stylesheets, so markdown output carries
--- every code block as raw HTML with pandoc's pygments highlight colors inlined
--- on each token span (color only: Canvas drops font-weight)
-local token_colors = {
-  kw = "#007020", cf = "#007020", ot = "#007020",
-  dt = "#902000",
-  dv = "#40a070", bn = "#40a070", fl = "#40a070",
-  ch = "#4070a0", st = "#4070a0", sc = "#4070a0", vs = "#4070a0",
-  ss = "#bb6688",
-  co = "#60a0b0", an = "#60a0b0", cv = "#60a0b0", wa = "#60a0b0", ["in"] = "#60a0b0",
-  al = "#ff0000", er = "#ff0000",
-  fu = "#06287e",
-  cn = "#880000",
-  im = "#008000", bu = "#008000",
-  va = "#19177c",
-  op = "#666666",
-  pp = "#bc7a00",
-  at = "#7d9029",
-  ["do"] = "#ba2121",
+-- every code block as raw HTML with Quarto's arrow-light highlight theme inlined
+-- on each token span. Canvas drops font-weight, so bold and italic are <b>/<i>
+local token_styles = {
+  kw = {color = "#003B4F", bold = true}, cf = {color = "#003B4F", bold = true},
+  ot = {color = "#003B4F"},
+  dt = {color = "#AD0000"}, dv = {color = "#AD0000"}, bn = {color = "#AD0000"},
+  fl = {color = "#AD0000"}, er = {color = "#AD0000"}, al = {color = "#AD0000"},
+  pp = {color = "#AD0000"},
+  st = {color = "#20794D"}, ch = {color = "#20794D"}, ss = {color = "#20794D"},
+  vs = {color = "#20794D"},
+  co = {color = "#5E5E5E"}, an = {color = "#5E5E5E"}, ["in"] = {color = "#5E5E5E"},
+  op = {color = "#5E5E5E"}, sc = {color = "#5E5E5E"},
+  cv = {color = "#5E5E5E", italic = true}, ["do"] = {color = "#5E5E5E", italic = true},
+  wa = {color = "#5E5E5E", italic = true},
+  fu = {color = "#4758AB"},
+  im = {color = "#00769E"},
+  cn = {color = "#8f5902"},
+  at = {color = "#657422"},
+  va = {color = "#111111"},
 }
 
-local code_block_style = "background-color: #f8f8f8; border: 1px solid #ddd; "
+local code_block_style = "color: #003B4F; background-color: #f8f8f8; border: 1px solid #ddd; "
   .. "border-radius: 4px; padding: 8px 12px; white-space: pre; overflow-x: auto;"
 
 function CodeBlock(el)
@@ -225,9 +226,20 @@ function CodeBlock(el)
     if wrapped > 0 then
       line = line:gsub("</span>$", "")
     end
-    line = line:gsub('<span class="(%w+)">', function(class)
-      local color = token_colors[class]
-      return color and ('<span style="color: ' .. color .. '">') or "<span>"
+    -- Token spans never nest, so each one closes before the next opens
+    line = line:gsub('<span class="(%w+)">(.-)</span>', function(class, text)
+      local style = token_styles[class]
+      if not style then
+        return text
+      end
+      local open, close = '<span style="color: ' .. style.color .. '">', "</span>"
+      if style.bold then
+        open, close = open .. "<b>", "</b>" .. close
+      end
+      if style.italic then
+        open, close = open .. "<i>", "</i>" .. close
+      end
+      return open .. text .. close
     end)
     lines[#lines + 1] = line
   end
