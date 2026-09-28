@@ -102,6 +102,7 @@ canvas:
   one_question_at_a_time: true
   cant_go_back: false
   access_code: "econ526"
+  ip_filter: "142.103.0.0/16"            # comma-separated addresses or CIDR ranges
   require_lockdown_browser: true
   require_lockdown_browser_for_results: false
   require_lockdown_browser_monitor: false

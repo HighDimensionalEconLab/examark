@@ -39,6 +39,7 @@ export interface Question {
   stem: string;           // Question text (may contain LaTeX)
   options: AnswerOption[]; // Empty for essay/short answer
   points: number;
+  pointsExplicit?: boolean; // Points were given in the header, so CLI defaults do not apply
   section?: string;        // Section this question belongs to
   instructions?: string;   // Optional per-question instructions
   images?: string[];       // Paths to images referenced in the question
@@ -67,6 +68,7 @@ export interface CanvasSettings {
   one_question_at_a_time?: boolean;
   cant_go_back?: boolean;
   access_code?: string;
+  ip_filter?: string;             // Comma-separated IP addresses or CIDR ranges
   description?: string;           // Quiz instructions (HTML allowed)
   require_lockdown_browser?: boolean;
   require_lockdown_browser_for_results?: boolean;

@@ -198,7 +198,7 @@ async function convertFile(
   if (defaultPoints && defaultPoints > 0) {
     parsed.defaultPoints = defaultPoints;
     parsed.questions.forEach(q => {
-      if (q.points === 1) {
+      if (!q.pointsExplicit) {
         q.points = defaultPoints;
       }
     });

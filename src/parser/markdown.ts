@@ -86,12 +86,13 @@ const CANVAS_VALUE_TYPES: Record<string, string | string[]> = {
   shuffle_answers: 'boolean', show_correct_answers: 'boolean', one_question_at_a_time: 'boolean',
   cant_go_back: 'boolean', require_lockdown_browser: 'boolean',
   require_lockdown_browser_for_results: 'boolean', require_lockdown_browser_monitor: 'boolean',
-  access_code: 'string', description: 'string', unlock_at: 'string', due_at: 'string', lock_at: 'string',
+  access_code: 'string', ip_filter: 'string', description: 'string',
+  unlock_at: 'string', due_at: 'string', lock_at: 'string',
 };
 
 const CANVAS_KEYS = new Set([
   'quiz_type', 'time_limit', 'allowed_attempts', 'scoring_policy', 'shuffle_answers', 'hide_results',
-  'show_correct_answers', 'one_question_at_a_time', 'cant_go_back', 'access_code', 'description',
+  'show_correct_answers', 'one_question_at_a_time', 'cant_go_back', 'access_code', 'ip_filter', 'description',
   'require_lockdown_browser', 'require_lockdown_browser_for_results', 'require_lockdown_browser_monitor',
   'unlock_at', 'due_at', 'lock_at',
 ]);
@@ -761,6 +762,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
       stem: cleanStem,
       options,
       points: currentQuestion.points || defaultPoints,
+      pointsExplicit: currentQuestion.pointsExplicit,
       section: currentSection?.id,
       images: extractImages(cleanStem),
       sourceLine: currentQuestionLine || undefined,
@@ -981,6 +983,7 @@ export function parseMarkdown(content: string): ParsedQuiz {
         type,
         stem: stemText,
         points: points || defaultPoints,
+        pointsExplicit: points !== null,
       };
       continue;
     }

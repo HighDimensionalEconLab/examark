@@ -762,6 +762,7 @@ export function generateAssessmentMeta(quiz: ParsedQuiz, assessmentIdent: string
   if (canvas.one_question_at_a_time !== undefined) fields.push(`<one_question_at_a_time>${canvas.one_question_at_a_time}</one_question_at_a_time>`);
   if (canvas.cant_go_back !== undefined) fields.push(`<cant_go_back>${canvas.cant_go_back}</cant_go_back>`);
   if (canvas.access_code !== undefined) fields.push(`<access_code>${escape(canvas.access_code)}</access_code>`);
+  if (canvas.ip_filter !== undefined) fields.push(`<ip_filter>${escape(canvas.ip_filter)}</ip_filter>`);
   if (canvas.require_lockdown_browser !== undefined) fields.push(`<require_lockdown_browser>${canvas.require_lockdown_browser}</require_lockdown_browser>`);
   if (canvas.require_lockdown_browser && canvas.require_lockdown_browser_for_results !== undefined) fields.push(`<require_lockdown_browser_for_results>${canvas.require_lockdown_browser_for_results}</require_lockdown_browser_for_results>`);
   if (canvas.require_lockdown_browser && canvas.require_lockdown_browser_monitor !== undefined) fields.push(`<require_lockdown_browser_monitor>${canvas.require_lockdown_browser_monitor}</require_lockdown_browser_monitor>`);
